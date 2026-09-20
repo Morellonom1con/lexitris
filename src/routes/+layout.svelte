@@ -1,5 +1,5 @@
 <script lang="ts">
-	import favicon from '$lib/assets/favicon.svg';
+	import favicon from "$lib/assets/favicon.svg";
 
 	let { children } = $props();
 </script>
@@ -9,3 +9,8 @@
 </svelte:head>
 
 {@render children()}
+
+<style>
+	.body {
+	}
+</style>

@@ -118,7 +118,7 @@
 					);
 				}
 			}
-		}, 1000);
+		}, 4000);
 		return () => clearInterval(interval);
 	});
 	function rotateBlock(currBlock: string[][]) {
@@ -824,7 +824,6 @@
 <h1>LEXITRIS</h1>
 
 <p>{target}</p>
-<p>{frameOrigin}</p>
 <div style="display: flex; flex-direction:column; align-items: center;">
 	{#each displayGrid as boardRow, row}
 		<div style="display: flex;">
@@ -836,24 +835,35 @@
 		</div>
 	{/each}
 </div>
+{#if phase == "gameover"}
+	<div style="background-color: #d7e837;">GAME OVER</div>
+{/if}
 <svelte:window onkeydown={handleKeyDown} />
 
 <style>
+	:global(body) {
+		font-family: Arial, Helvetica, sans-serif;
+	}
 	.greenBox {
 		height: 30px;
 		width: 30px;
-		background-color: #57c1b6;
+		background-color: #d7e837;
 		border: solid 1px #ffffff;
+		text-align: center;
+		line-height: 30px;
 	}
 	.greyBox {
 		height: 30px;
 		width: 30px;
 		background-color: #a0a0a0;
 		border: solid 1px #ffffff;
+		text-align: center;
+		line-height: 30px;
 	}
 	.nullBox {
 		height: 30px;
 		width: 30px;
+		background-color: #f4f8ff;
 		border: solid 1px #ffffff;
 	}
 	.graceFilledBox {
@@ -869,13 +879,13 @@
 	.tetrisFilledBox {
 		height: 30px;
 		width: 30px;
-		background-color: #647200;
+		background-color: #4067c4;
 		border: solid 1px #ffffff;
 	}
 	.tetrisUnfilledBox {
 		height: 30px;
 		width: 30px;
-		background-color: #64726e;
+		background-color: #e5edff;
 		border: solid 1px #ffffff;
 	}
 </style>
