@@ -21,6 +21,7 @@
 
 	let frameOrigin = $state([0, 2]);
 	let currBlock: string[][] = $state([]);
+	let rotationAnchor: number[] = $state([]);
 
 	let greens = $derived.by(() => {
 		let greens = new Set<string>();
@@ -34,7 +35,7 @@
 		return greens;
 	});
 	let currentLongest = $derived(largestConnected(greens));
-	let currBlockOrigin = $derived(getBoundingRect(currentLongest)[0]);
+	let currBlockOrigin: number[] = $state([0, 0]);
 	let displayGrid: Cell[][] = $derived(
 		updateGrid(
 			board,
@@ -78,9 +79,23 @@
 					frameOrigin[0]++;
 				} else {
 					currBlock = getBlock(currentLongest);
+					currBlockOrigin =
+						getBoundingRect(
+							currentLongest,
+						)[0];
 					phase = "falling";
 					if (currBlock.length == 0) {
 						phase = "gameover";
+					} else {
+						rotationAnchor = [
+							currBlockOrigin[0] +
+								currBlock.length /
+									2,
+							currBlockOrigin[1] +
+								currBlock[0]
+									.length /
+									2,
+						];
 					}
 				}
 			} else if (phase == "falling") {
@@ -96,38 +111,106 @@
 				) {
 					frameOrigin[0]++;
 				} else {
-					for (
-						let i = 0;
-						i < currBlock.length;
-						i++
-					) {
-						for (
-							let j = 0;
-							j < currBlock[0].length;
-							j++
-						) {
-							if (
-								currBlock[i][
-									j
-								] == "1"
-							)
-								board[
-									i +
-										frameOrigin[0] +
-										currBlockOrigin[0]
-								][
-									j +
-										frameOrigin[1] +
-										currBlockOrigin[1]
-								] = 1;
-						}
-					}
-					nextBuild();
+					lockBlock(
+						currBlock,
+						frameOrigin,
+						currBlockOrigin,
+					);
 				}
 			}
 		}, 1000);
 		return () => clearInterval(interval);
 	});
+	function rotateBlock(currBlock: string[][]) {
+		let result: string[][] = [];
+		for (let j = 0; j < currBlock[0].length; j++) {
+			const newRow = [];
+			for (let i = currBlock.length - 1; i >= 0; i--) {
+				newRow.push(currBlock[i][j]);
+			}
+			result.push(newRow);
+		}
+		return result;
+	}
+
+	function isValidBlockPosition(
+		currBlock: string[][],
+		frameOrigin: number[],
+		currBlockOrigin: number[],
+		board: number[][],
+	) {
+		if (
+			frameOrigin[0] + currBlockOrigin[0] >= 0 &&
+			frameOrigin[1] + currBlockOrigin[1] >= 0 &&
+			frameOrigin[0] +
+				currBlockOrigin[0] +
+				currBlock.length -
+				1 <
+				board.length &&
+			frameOrigin[1] +
+				currBlockOrigin[1] +
+				currBlock[0].length -
+				1 <
+				board[0].length
+		) {
+			for (let i = 0; i < currBlock.length; i++) {
+				for (let j = 0; j < currBlock[0].length; j++) {
+					let r =
+						i +
+						currBlockOrigin[0] +
+						frameOrigin[0];
+					let c =
+						j +
+						currBlockOrigin[1] +
+						frameOrigin[1];
+					if (
+						currBlock[i][j] == "1" &&
+						board[r][c] == 1
+					) {
+						return false;
+					}
+				}
+			}
+			return true;
+		} else return false;
+	}
+	function lockBlock(
+		currBlock: string[][],
+		frameOrigin: number[],
+		currBlockOrigin: number[],
+	) {
+		for (let i = 0; i < currBlock.length; i++) {
+			for (let j = 0; j < currBlock[0].length; j++) {
+				if (currBlock[i][j] == "1")
+					board[
+						i +
+							frameOrigin[0] +
+							currBlockOrigin[0]
+					][
+						j +
+							frameOrigin[1] +
+							currBlockOrigin[1]
+					] = 1;
+			}
+		}
+		for (let i = 0; i < board.length; i++) {
+			if (board[i].every((val) => val === 1)) {
+				for (let j = i; j > 0; j--) {
+					board[j] = board[j - 1];
+				}
+				board[0] = Array(10).fill(0);
+			}
+		}
+		for (let i = 0; i < 4; i++) {
+			for (let j = 0; j < board[0].length; j++) {
+				if (board[i][j] == 1) {
+					phase = "gameover";
+					return;
+				}
+			}
+		}
+		nextBuild();
+	}
 	function updateGrid(
 		board: number[][],
 		phase: "building" | "falling" | "gameover",
@@ -172,25 +255,19 @@
 					}
 				}
 				if (phase == "falling") {
-					if (withinFrame(frameOrigin, [i, j])) {
-						let r =
-							i -
-							currBlockOrigin[0] -
-							frameOrigin[0];
-						let c =
-							j -
-							currBlockOrigin[1] -
-							frameOrigin[1];
-						if (
-							currBlock[r] &&
-							currBlock[r][c] === "1"
-						) {
-							className = "greenBox";
-						} else if (currBlock[r]) {
-							className = "greyBox";
-						} else {
-							className = "nullBox";
-						}
+					let r =
+						i -
+						currBlockOrigin[0] -
+						frameOrigin[0];
+					let c =
+						j -
+						currBlockOrigin[1] -
+						frameOrigin[1];
+					if (
+						currBlock[r] &&
+						currBlock[r][c] === "1"
+					) {
+						className = "greenBox";
 						tempGrid[i][j].className =
 							className;
 						continue;
@@ -237,7 +314,7 @@
 				} else return false;
 			}
 			return true;
-		} else {
+		} else if (phase == "falling") {
 			let cellsToBeChecked: number[][] = [];
 			for (let j = 0; j < currBlock[0].length; j++) {
 				let i = currBlock.length;
@@ -273,6 +350,111 @@
 			return true;
 		}
 	}
+	function canFrameMoveRight(
+		guessesBoundingRectInBoardSpace: number[][],
+		board: number[][],
+	) {
+		let j = guessesBoundingRectInBoardSpace[1][1];
+		for (
+			let i = guessesBoundingRectInBoardSpace[0][0];
+			i <= guessesBoundingRectInBoardSpace[1][0];
+			i++
+		) {
+			if (board[i][j + 1] == 1) return false;
+		}
+		return true;
+	}
+	function canFrameMoveLeft(
+		guessesBoundingRectInBoardSpace: number[][],
+		board: number[][],
+	) {
+		let j = guessesBoundingRectInBoardSpace[0][1];
+		for (
+			let i = guessesBoundingRectInBoardSpace[0][0];
+			i <= guessesBoundingRectInBoardSpace[1][0];
+			i++
+		) {
+			if (board[i][j - 1] == 1) return false;
+		}
+		return true;
+	}
+	function canBlockMoveRight(
+		currBlock: string[][],
+		currBlockOrigin: number[],
+		frameOrigin: number[],
+		board: number[][],
+	) {
+		let cellsToBeChecked: number[][] = [];
+		for (let i = 0; i < currBlock.length; i++) {
+			let j = currBlock[0].length;
+			while (j - 1 > 0 && currBlock[i][j - 1] == "0") {
+				j--;
+			}
+			cellsToBeChecked.push([i, j]);
+		}
+		for (let i = 0; i < cellsToBeChecked.length; i++) {
+			if (
+				cellsToBeChecked[i][1] +
+					currBlockOrigin[1] +
+					frameOrigin[1] <
+				board[0].length
+			) {
+				if (
+					board[
+						cellsToBeChecked[i][0] +
+							currBlockOrigin[0] +
+							frameOrigin[0]
+					][
+						cellsToBeChecked[i][1] +
+							currBlockOrigin[1] +
+							frameOrigin[1]
+					] == 1
+				)
+					return false;
+			} else return false;
+		}
+		return true;
+	}
+	function canBlockMoveLeft(
+		currBlock: string[][],
+		currBlockOrigin: number[],
+		frameOrigin: number[],
+		board: number[][],
+	) {
+		let cellsToBeChecked: number[][] = [];
+		for (let i = 0; i < currBlock.length; i++) {
+			let j = -1;
+			while (
+				j + 1 < currBlock[0].length &&
+				currBlock[i][j + 1] == "0"
+			) {
+				j++;
+			}
+			cellsToBeChecked.push([i, j]);
+		}
+		for (let i = 0; i < cellsToBeChecked.length; i++) {
+			if (
+				cellsToBeChecked[i][1] +
+					currBlockOrigin[1] +
+					frameOrigin[1] >
+				-1
+			) {
+				if (
+					board[
+						cellsToBeChecked[i][0] +
+							currBlockOrigin[0] +
+							frameOrigin[0]
+					][
+						cellsToBeChecked[i][1] +
+							currBlockOrigin[1] +
+							frameOrigin[1]
+					] == 1
+				)
+					return false;
+			} else return false;
+		}
+		return true;
+	}
 	function handleKeyDown(event: KeyboardEvent) {
 		if (
 			event.key === "Enter" &&
@@ -302,8 +484,22 @@
 				} else {
 					phase = "falling";
 					currBlock = getBlock(currentLongest);
+					currBlockOrigin =
+						getBoundingRect(
+							currentLongest,
+						)[0];
 					if (currBlock.length == 0) {
 						phase = "gameover";
+					} else {
+						rotationAnchor = [
+							currBlockOrigin[0] +
+								currBlock.length /
+									2,
+							currBlockOrigin[1] +
+								currBlock[0]
+									.length /
+									2,
+						];
 					}
 				}
 			} else {
@@ -327,17 +523,39 @@
 							getBlock(
 								currentLongest,
 							);
+						currBlockOrigin =
+							getBoundingRect(
+								currentLongest,
+							)[0];
 					}
 				} else {
 					guesses.push(newGuess);
 					currBlock = getBlock(currentLongest);
-					if (currBlock.length == 0) {
-						phase = "gameover";
-					}
+					currBlockOrigin =
+						getBoundingRect(
+							currentLongest,
+						)[0];
 				}
 				if (guesses.length == maxGuesses) {
 					phase = "falling";
 					currBlock = getBlock(currentLongest);
+					currBlockOrigin =
+						getBoundingRect(
+							currentLongest,
+						)[0];
+					if (currBlock.length == 0) {
+						phase = "gameover";
+					} else {
+						rotationAnchor = [
+							currBlockOrigin[0] +
+								currBlock.length /
+									2,
+							currBlockOrigin[1] +
+								currBlock[0]
+									.length /
+									2,
+						];
+					}
 				}
 			}
 
@@ -346,7 +564,23 @@
 		if (event.key == "ArrowRight") {
 			event.preventDefault();
 			if (phase == "building") {
-				if (frameOrigin[1] + 4 < board[0].length - 1)
+				if (
+					frameOrigin[1] + 4 <
+						board[0].length - 1 &&
+					canFrameMoveRight(
+						[
+							frameOrigin,
+							[
+								frameOrigin[0] +
+									guesses.length -
+									1,
+								frameOrigin[1] +
+									4,
+							],
+						],
+						board,
+					)
+				)
 					frameOrigin[1]++;
 			} else if (phase == "falling") {
 				if (
@@ -354,7 +588,13 @@
 						currBlockOrigin[1] +
 						currBlock[0].length -
 						1 <
-					board[0].length - 1
+						board[0].length - 1 &&
+					canBlockMoveRight(
+						currBlock,
+						currBlockOrigin,
+						frameOrigin,
+						board,
+					)
 				)
 					frameOrigin[1]++;
 			}
@@ -362,18 +602,113 @@
 		if (event.key == "ArrowLeft") {
 			event.preventDefault();
 			if (phase == "building") {
-				if (frameOrigin[1] > 0) frameOrigin[1]--;
+				if (
+					frameOrigin[1] > 0 &&
+					canFrameMoveLeft(
+						[
+							frameOrigin,
+							[
+								frameOrigin[0] +
+									guesses.length -
+									1,
+								frameOrigin[1] +
+									4,
+							],
+						],
+						board,
+					)
+				)
+					frameOrigin[1]--;
 			} else if (phase == "falling") {
-				if (frameOrigin[1] + currBlockOrigin[1] > 0)
+				if (
+					frameOrigin[1] + currBlockOrigin[1] >
+						0 &&
+					canBlockMoveLeft(
+						currBlock,
+						currBlockOrigin,
+						frameOrigin,
+						board,
+					)
+				)
 					frameOrigin[1]--;
 			}
 		}
+		if (event.key == "ArrowDown") {
+			if (phase != "gameover") {
+				event.preventDefault();
+				if (
+					canFrameFall(
+						phase,
+						frameOrigin,
+						currBlockOrigin,
+						guesses,
+						board,
+						currBlock,
+					)
+				) {
+					frameOrigin[0]++;
+				}
+			}
+		}
+		if (event.key == "ArrowUp") {
+			if (phase == "falling") {
+				event.preventDefault();
+				let rotated = rotateBlock(currBlock);
+				let shiftedBlockOrigin = [
+					Math.floor(
+						rotationAnchor[0] -
+							rotated.length / 2,
+					),
+					Math.floor(
+						rotationAnchor[1] -
+							rotated[0].length / 2,
+					),
+				];
+				if (
+					isValidBlockPosition(
+						rotated,
+						frameOrigin,
+						shiftedBlockOrigin,
+						board,
+					)
+				) {
+					currBlock = rotated;
+					currBlockOrigin = shiftedBlockOrigin;
+				}
+			}
+		}
 		if (event.key == "Backspace") {
+			if (phase != "gameover") {
+				event.preventDefault();
+				newGuess = newGuess.slice(0, -1);
+			}
+		}
+		if (event.key == " ") {
 			event.preventDefault();
-			newGuess = newGuess.slice(0, -1);
+			if (phase == "falling") {
+				while (
+					canFrameFall(
+						phase,
+						frameOrigin,
+						currBlockOrigin,
+						guesses,
+						board,
+						currBlock,
+					)
+				) {
+					frameOrigin[0]++;
+				}
+				lockBlock(
+					currBlock,
+					frameOrigin,
+					currBlockOrigin,
+				);
+			}
 		}
 		if (newGuess.length < 5 && event.key.match(/^[a-zA-Z]$/)) {
-			newGuess += event.key;
+			if (phase != "gameover") {
+				newGuess += event.key;
+			}
 		}
 	}
 	function nextBuild() {
@@ -382,6 +717,7 @@
 		newGuess = "";
 		frameOrigin = [0, 2];
 		currBlock = [];
+		currBlockOrigin = [0, 0];
 		phase = "building";
 	}
 	function withinFrame(frameOrigin: number[], coord: number[]) {
@@ -488,21 +824,8 @@
 <h1>LEXITRIS</h1>
 
 <p>{target}</p>
-<div style="display: block;">
-	{#each currBlock as row}
-		<div style="display: flex;">
-			{#each row as box}
-				{#if box == "1"}
-					<div class="greenBox"></div>
-				{:else}
-					<div class="nullBox"></div>
-				{/if}
-			{/each}
-		</div>
-	{/each}
-</div>
-<p>{currBlock}</p>
-<div style="display: block;">
+<p>{frameOrigin}</p>
+<div style="display: flex; flex-direction:column; align-items: center;">
 	{#each displayGrid as boardRow, row}
 		<div style="display: flex;">
 			{#each boardRow as _, col}
