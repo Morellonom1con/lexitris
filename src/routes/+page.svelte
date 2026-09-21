@@ -24,6 +24,18 @@
 	let rotationAnchor: number[] = $state([]);
 
 	const keyboardRows = ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"];
+	const STEP_PX = 24;
+	const TAP_SLOP_PX = 10;
+	const TAP_MS = 250;
+	const FLICK_PX = 60;
+	const FLICK_MS = 250;
+	let pointerStartX = 0;
+	let pointerStartY = 0;
+	let pointerStartTime = 0;
+	let consumedX = 0;
+	let consumedY = 0;
+	let gestureAxis: "x" | "y" | null = null;
+	let gestureActive = false;
 	let controlkeys = [
 		"Enter",
 		"`",
@@ -56,6 +68,7 @@
 			currBlockOrigin,
 			target,
 			currBlock,
+			newGuess,
 		),
 	);
 	let score: number = $state(0);
@@ -238,6 +251,7 @@
 		currBlockOrigin: number[],
 		target: string,
 		currBlock: string[][],
+		newGuess: string,
 	) {
 		let tempGrid: Cell[][] = Array.from({ length: 24 }, () =>
 			Array.from({ length: 10 }, () => ({
@@ -263,6 +277,12 @@
 						} else if (guesses[r]) {
 							className = "greyBox";
 							letter = guesses[r][c];
+						} else if (
+							r === guesses.length &&
+							newGuess[c]
+						) {
+							className = "nullBox";
+							letter = newGuess[c];
 						} else {
 							className = "nullBox";
 						}
@@ -720,6 +740,69 @@
 			}
 		}
 	}
+	function handlePointerDown(e: PointerEvent) {
+		if (e.pointerType === "mouse") return;
+		gestureActive = true;
+		pointerStartX = e.clientX;
+		pointerStartY = e.clientY;
+		pointerStartTime = performance.now();
+		consumedX = 0;
+		consumedY = 0;
+		gestureAxis = null;
+		(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+	}
+	function handlePointerMove(e: PointerEvent) {
+		if (!gestureActive) return;
+		const dx = e.clientX - pointerStartX;
+		const dy = e.clientY - pointerStartY;
+		if (gestureAxis === null) {
+			if (Math.abs(dx) < STEP_PX && Math.abs(dy) < STEP_PX)
+				return;
+			gestureAxis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+		}
+		if (gestureAxis === "x") {
+			const steps = Math.trunc(dx / STEP_PX) - consumedX;
+			for (let i = 0; i < Math.abs(steps); i++) {
+				handleKeyDown(
+					steps > 0 ? "ArrowRight" : "ArrowLeft",
+				);
+			}
+			consumedX += steps;
+		} else {
+			const steps = Math.trunc(dy / STEP_PX) - consumedY;
+			for (let i = 0; i < steps; i++) {
+				handleKeyDown("ArrowDown");
+			}
+			if (steps > 0) consumedY += steps;
+		}
+	}
+	function handlePointerUp(e: PointerEvent) {
+		if (!gestureActive) return;
+		gestureActive = false;
+		const dx = e.clientX - pointerStartX;
+		const dy = e.clientY - pointerStartY;
+		const elapsed = performance.now() - pointerStartTime;
+		if (
+			Math.abs(dx) < TAP_SLOP_PX &&
+			Math.abs(dy) < TAP_SLOP_PX &&
+			elapsed < TAP_MS
+		) {
+			handleKeyDown("ArrowUp");
+		} else if (
+			dy > FLICK_PX &&
+			dy > Math.abs(dx) &&
+			elapsed < FLICK_MS
+		) {
+			handleKeyDown(" ");
+		}
+		gestureAxis = null;
+	}
+	function handlePointerCancel() {
+		gestureActive = false;
+		gestureAxis = null;
+		consumedX = 0;
+		consumedY = 0;
+	}
 	function nextBuild() {
 		guesses.length = 0;
 		target = getNewTarget();
@@ -838,32 +921,47 @@
 	}
 </script>
 
-<h1>LEXITRIS</h1>
-<div style="display: flex;">
-	<div style="display: block; padding-right:35%">
-		<p>{score}</p>
-		<p>Held word : {heldWord}</p>
-		<p>Reroll Charge : {rerollCharge}</p>
-		<p>Hold Charge : {holdCharge}</p>
-	</div>
-	<div style="display: flex; flex-direction:column; align-items: center;">
-		<p
-			style="font-size:20px; font-weight:bold;background-color: #d7e837;"
+<div
+	class="gameArea"
+	role="application"
+	aria-label="Lexitris board"
+	onpointerdown={handlePointerDown}
+	onpointermove={handlePointerMove}
+	onpointerup={handlePointerUp}
+	onpointercancel={handlePointerCancel}
+>
+	<h1>LEXITRIS</h1>
+	<div class="gameGrid">
+		<div class="stats">
+			<p style="font-weight:bold;">{score}</p>
+			<p>Held word : <b>{heldWord}</b></p>
+			<br />
+			<p>Reroll Charge : {rerollCharge}</p>
+			<p>Hold Charge : {holdCharge}</p>
+		</div>
+		<div
+			style="display: flex; flex-direction:column; align-items: center;"
 		>
-			{target}
-		</p>
-		{#each displayGrid as boardRow, row}
-			<div style="display: flex;">
-				{#each boardRow as _, col}
-					<div
-						class={displayGrid[row][col]
-							.className}
-					>
-						{displayGrid[row][col].letter}
-					</div>
-				{/each}
-			</div>
-		{/each}
+			<p
+				style="font-size:20px; font-weight:bold;background-color: #d7e837;"
+			>
+				{target}
+			</p>
+			{#each displayGrid as boardRow, row}
+				<div style="display: flex;">
+					{#each boardRow as _, col}
+						<div
+							class={displayGrid[row][
+								col
+							].className}
+						>
+							{displayGrid[row][col]
+								.letter}
+						</div>
+					{/each}
+				</div>
+			{/each}
+		</div>
 	</div>
 </div>
 <div class="keyboard">
@@ -898,7 +996,7 @@
 	{/each}
 </div>
 {#if phase == "gameover"}
-	<div style="background-color: #d7e837;">GAME OVER</div>
+	<div style="background-color: #d7e837; font-weight:bold">GAME OVER</div>
 	<button onclick={reset}>RESTART</button>
 {/if}
 <svelte:window
@@ -933,6 +1031,8 @@
 		width: 20px;
 		background-color: #f4f8ff;
 		border: solid 1px #ffffff;
+		text-align: center;
+		line-height: 20px;
 	}
 	.graceFilledBox {
 		height: 20px;
@@ -955,6 +1055,19 @@
 		width: 20px;
 		background-color: #e5edff;
 		border: solid 1px #ffffff;
+	}
+	.gameArea {
+		touch-action: none;
+		user-select: none;
+	}
+	.gameGrid {
+		display: grid;
+		grid-template-columns: 1fr auto 1fr;
+		align-items: center;
+	}
+	.stats {
+		justify-self: end;
+		padding-right: 14px;
 	}
 	.keyboard {
 		display: none;
