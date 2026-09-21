@@ -23,6 +23,17 @@
 	let currBlock: string[][] = $state([]);
 	let rotationAnchor: number[] = $state([]);
 
+	const keyboardRows = ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"];
+	let controlkeys = [
+		"Enter",
+		"`",
+		"ArrowUp",
+		"ArrowLeft",
+		"ArrowRight",
+		"ArrowDown",
+		" ",
+		"Backspace",
+	];
 	let greens = $derived.by(() => {
 		let greens = new Set<string>();
 		for (let i = 0; i < guesses.length; i++) {
@@ -47,6 +58,7 @@
 			currBlock,
 		),
 	);
+	let score: number = $state(0);
 
 	onMount(async () => {
 		const validNonAnswers = new Set(
@@ -193,14 +205,17 @@
 					] = 1;
 			}
 		}
+		let linesCleared = 0;
 		for (let i = 0; i < board.length; i++) {
 			if (board[i].every((val) => val === 1)) {
+				linesCleared++;
 				for (let j = i; j > 0; j--) {
 					board[j] = board[j - 1];
 				}
 				board[0] = Array(10).fill(0);
 			}
 		}
+		score += getScoreForClear(linesCleared);
 		for (let i = 0; i < 4; i++) {
 			for (let j = 0; j < board[0].length; j++) {
 				if (board[i][j] == 1) {
@@ -210,6 +225,10 @@
 			}
 		}
 		nextBuild();
+	}
+	function getScoreForClear(linesCleared: number) {
+		const lineScore = [0, 40, 100, 300, 1200, 6000];
+		return lineScore[linesCleared];
 	}
 	function updateGrid(
 		board: number[][],
@@ -455,16 +474,14 @@
 		}
 		return true;
 	}
-	function handleKeyDown(event: KeyboardEvent) {
+	function handleKeyDown(key: string) {
 		if (
-			event.key === "Enter" &&
+			key === "Enter" &&
 			phase == "building" &&
 			newGuess.length === 5 &&
 			validGuesses.has(newGuess.toLowerCase()) &&
 			!guesses.includes(newGuess.toUpperCase())
 		) {
-			event.preventDefault();
-
 			newGuess = newGuess.toUpperCase();
 
 			if (newGuess === target) {
@@ -561,8 +578,7 @@
 
 			newGuess = "";
 		}
-		if (event.key == "ArrowRight") {
-			event.preventDefault();
+		if (key == "ArrowRight") {
 			if (phase == "building") {
 				if (
 					frameOrigin[1] + 4 <
@@ -584,11 +600,6 @@
 					frameOrigin[1]++;
 			} else if (phase == "falling") {
 				if (
-					frameOrigin[1] +
-						currBlockOrigin[1] +
-						currBlock[0].length -
-						1 <
-						board[0].length - 1 &&
 					canBlockMoveRight(
 						currBlock,
 						currBlockOrigin,
@@ -599,8 +610,7 @@
 					frameOrigin[1]++;
 			}
 		}
-		if (event.key == "ArrowLeft") {
-			event.preventDefault();
+		if (key == "ArrowLeft") {
 			if (phase == "building") {
 				if (
 					frameOrigin[1] > 0 &&
@@ -621,8 +631,6 @@
 					frameOrigin[1]--;
 			} else if (phase == "falling") {
 				if (
-					frameOrigin[1] + currBlockOrigin[1] >
-						0 &&
 					canBlockMoveLeft(
 						currBlock,
 						currBlockOrigin,
@@ -633,9 +641,8 @@
 					frameOrigin[1]--;
 			}
 		}
-		if (event.key == "ArrowDown") {
+		if (key == "ArrowDown") {
 			if (phase != "gameover") {
-				event.preventDefault();
 				if (
 					canFrameFall(
 						phase,
@@ -650,9 +657,8 @@
 				}
 			}
 		}
-		if (event.key == "ArrowUp") {
+		if (key == "ArrowUp") {
 			if (phase == "falling") {
-				event.preventDefault();
 				let rotated = rotateBlock(currBlock);
 				let shiftedBlockOrigin = [
 					Math.floor(
@@ -677,14 +683,17 @@
 				}
 			}
 		}
-		if (event.key == "Backspace") {
+		if (key == "Backspace") {
 			if (phase != "gameover") {
-				event.preventDefault();
 				newGuess = newGuess.slice(0, -1);
 			}
 		}
-		if (event.key == " ") {
-			event.preventDefault();
+		if (key == "`") {
+			if (phase != "gameover") {
+				reset();
+			}
+		}
+		if (key == " ") {
 			if (phase == "falling") {
 				while (
 					canFrameFall(
@@ -705,9 +714,9 @@
 				);
 			}
 		}
-		if (newGuess.length < 5 && event.key.match(/^[a-zA-Z]$/)) {
+		if (newGuess.length < 5 && key.match(/^[a-zA-Z]$/)) {
 			if (phase != "gameover") {
-				newGuess += event.key;
+				newGuess += key;
 			}
 		}
 	}
@@ -719,6 +728,14 @@
 		currBlock = [];
 		currBlockOrigin = [0, 0];
 		phase = "building";
+		rerollCharge = 1;
+		holdCharge = 1;
+	}
+	function reset() {
+		nextBuild();
+		board = Array.from({ length: 24 }, () => Array(10).fill(0));
+		score = 0;
+		heldWord = "";
 	}
 	function withinFrame(frameOrigin: number[], coord: number[]) {
 		if (
@@ -822,70 +839,156 @@
 </script>
 
 <h1>LEXITRIS</h1>
-
-<p>{target}</p>
-<div style="display: flex; flex-direction:column; align-items: center;">
-	{#each displayGrid as boardRow, row}
-		<div style="display: flex;">
-			{#each boardRow as _, col}
-				<div class={displayGrid[row][col].className}>
-					{displayGrid[row][col].letter}
-				</div>
+<div style="display: flex;">
+	<div style="display: block; padding-right:35%">
+		<p>{score}</p>
+		<p>Held word : {heldWord}</p>
+		<p>Reroll Charge : {rerollCharge}</p>
+		<p>Hold Charge : {holdCharge}</p>
+	</div>
+	<div style="display: flex; flex-direction:column; align-items: center;">
+		<p
+			style="font-size:20px; font-weight:bold;background-color: #d7e837;"
+		>
+			{target}
+		</p>
+		{#each displayGrid as boardRow, row}
+			<div style="display: flex;">
+				{#each boardRow as _, col}
+					<div
+						class={displayGrid[row][col]
+							.className}
+					>
+						{displayGrid[row][col].letter}
+					</div>
+				{/each}
+			</div>
+		{/each}
+	</div>
+</div>
+<div class="keyboard">
+	{#each keyboardRows as row, i}
+		<div class="keyboardRow">
+			{#if i == 2}
+				<button
+					class="key wideKey"
+					type="button"
+					onclick={() => handleKeyDown("Enter")}
+					>ENTER</button
+				>
+			{/if}
+			{#each row.split("") as letter}
+				<button
+					class="key"
+					type="button"
+					onclick={() => handleKeyDown(letter)}
+					>{letter}</button
+				>
 			{/each}
+			{#if i == 2}
+				<button
+					class="key wideKey"
+					type="button"
+					onclick={() =>
+						handleKeyDown("Backspace")}
+					>DEL</button
+				>
+			{/if}
 		</div>
 	{/each}
 </div>
 {#if phase == "gameover"}
 	<div style="background-color: #d7e837;">GAME OVER</div>
+	<button onclick={reset}>RESTART</button>
 {/if}
-<svelte:window onkeydown={handleKeyDown} />
+<svelte:window
+	onkeydown={(e) => {
+		if (controlkeys.includes(e.key)) e.preventDefault();
+		handleKeyDown(e.key);
+	}}
+/>
 
 <style>
 	:global(body) {
-		font-family: Arial, Helvetica, sans-serif;
+		font-family: arial, helvetica, sans-serif;
 	}
 	.greenBox {
-		height: 30px;
-		width: 30px;
+		height: 20px;
+		width: 20px;
 		background-color: #d7e837;
 		border: solid 1px #ffffff;
 		text-align: center;
-		line-height: 30px;
+		line-height: 20px;
 	}
 	.greyBox {
-		height: 30px;
-		width: 30px;
+		height: 20px;
+		width: 20px;
 		background-color: #a0a0a0;
 		border: solid 1px #ffffff;
 		text-align: center;
-		line-height: 30px;
+		line-height: 20px;
 	}
 	.nullBox {
-		height: 30px;
-		width: 30px;
+		height: 20px;
+		width: 20px;
 		background-color: #f4f8ff;
 		border: solid 1px #ffffff;
 	}
 	.graceFilledBox {
-		height: 30px;
-		width: 30px;
+		height: 20px;
+		width: 20px;
 		border: solid 1px #ffffff;
 	}
 	.graceUnfilledBox {
-		height: 30px;
-		width: 30px;
+		height: 20px;
+		width: 20px;
 		border: solid 1px #ffffff;
 	}
 	.tetrisFilledBox {
-		height: 30px;
-		width: 30px;
+		height: 20px;
+		width: 20px;
 		background-color: #4067c4;
 		border: solid 1px #ffffff;
 	}
 	.tetrisUnfilledBox {
-		height: 30px;
-		width: 30px;
+		height: 20px;
+		width: 20px;
 		background-color: #e5edff;
 		border: solid 1px #ffffff;
+	}
+	.keyboard {
+		display: none;
+		flex-direction: column;
+		align-items: center;
+		gap: 6px;
+		margin-top: 12px;
+	}
+	.keyboardRow {
+		display: flex;
+		gap: 4px;
+	}
+	.key {
+		min-width: 28px;
+		height: 44px;
+		padding: 0 4px;
+		font-size: 14px;
+		font-weight: bold;
+		font-family: inherit;
+		border: solid 1px #a0a0a0;
+		border-radius: 4px;
+		background-color: #ffffff;
+		touch-action: manipulation;
+	}
+	.key:active {
+		background-color: #d7e837;
+	}
+	.wideKey {
+		min-width: 44px;
+		font-size: 11px;
+	}
+	@media (pointer: coarse) {
+		.keyboard {
+			display: flex;
+		}
 	}
 </style>

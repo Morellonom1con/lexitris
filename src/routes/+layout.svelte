@@ -9,8 +9,3 @@
 </svelte:head>
 
 {@render children()}
-
-<style>
-	.body {
-	}
-</style>
