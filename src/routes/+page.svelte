@@ -962,6 +962,14 @@
 				</div>
 			{/each}
 		</div>
+		<div class="endPanel">
+			{#if phase == "gameover"}
+				<div style="background-color: #d7e837; font-weight:bold">
+					GAME OVER
+				</div>
+				<button onclick={reset}>RESTART</button>
+			{/if}
+		</div>
 	</div>
 </div>
 <div class="keyboard">
@@ -995,10 +1003,6 @@
 		</div>
 	{/each}
 </div>
-{#if phase == "gameover"}
-	<div style="background-color: #d7e837; font-weight:bold">GAME OVER</div>
-	<button onclick={reset}>RESTART</button>
-{/if}
 <svelte:window
 	onkeydown={(e) => {
 		if (controlkeys.includes(e.key)) e.preventDefault();
@@ -1068,6 +1072,11 @@
 	.stats {
 		justify-self: end;
 		padding-right: 14px;
+	}
+	.endPanel {
+		justify-self: start;
+		padding-left: 14px;
+		text-align: center;
 	}
 	.keyboard {
 		display: none;
