@@ -736,7 +736,7 @@
 		}
 		if (newGuess.length < 5 && key.match(/^[a-zA-Z]$/)) {
 			if (phase != "gameover") {
-				newGuess += key;
+				newGuess += key.toUpperCase();
 			}
 		}
 	}
@@ -964,7 +964,9 @@
 		</div>
 		<div class="endPanel">
 			{#if phase == "gameover"}
-				<div style="background-color: #d7e837; font-weight:bold">
+				<div
+					style="background-color: #d7e837; font-weight:bold"
+				>
 					GAME OVER
 				</div>
 				<button onclick={reset}>RESTART</button>
