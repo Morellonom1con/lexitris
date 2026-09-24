@@ -923,27 +923,65 @@
 
 <div
 	class="gameArea"
+	style:--rows={displayGrid.length}
+	style:--cols={displayGrid[0]?.length ?? 1}
 	role="application"
 	aria-label="Lexitris board"
 	onpointerdown={handlePointerDown}
 	onpointermove={handlePointerMove}
 	onpointerup={handlePointerUp}
 	onpointercancel={handlePointerCancel}
+	style="display: grid; grid-template-rows:auto 1fr auto;  height: 95dvh;"
 >
-	<h1>LEXITRIS</h1>
+	<p
+		style="font-size:25px ;text-align: center; font-weight:bold; margin: 15px;"
+	>
+		LEXITRIS
+	</p>
 	<div class="gameGrid">
 		<div class="stats">
-			<p style="font-weight:bold;">{score}</p>
-			<p>Held word : <b>{heldWord}</b></p>
+			<p style="font-weight:bold; text-align: center;">
+				SCORE
+			</p>
+			<p style="font-weight:bold; text-align: center;">
+				{score}
+			</p>
 			<br />
-			<p>Reroll Charge : {rerollCharge}</p>
-			<p>Hold Charge : {holdCharge}</p>
+			<br />
+			<p style="text-align: center;">On Hold</p>
+			<p style="text-align: center;"><b>{heldWord}</b></p>
+			<br />
+			<br />
+			<p
+				class={rerollCharge == 1
+					? "activeCharge"
+					: "inactiveCharge"}
+			>
+				REROLL
+			</p>
+			<p
+				class={holdCharge == 1
+					? "activeCharge"
+					: "inactiveCharge"}
+			>
+				HOLD
+			</p>
+			<div class="endPanel">
+				{#if phase == "gameover"}
+					<div
+						style="background-color: #d7e837; font-weight:bold"
+					>
+						GAME OVER
+					</div>
+					<button onclick={reset}>RESTART</button>
+				{/if}
+			</div>
 		</div>
 		<div
 			style="display: flex; flex-direction:column; align-items: center;"
 		>
 			<p
-				style="font-size:20px; font-weight:bold;background-color: #d7e837;"
+				style="font-size:25px; font-weight:bold;background-color: #d7e837;"
 			>
 				{target}
 			</p>
@@ -951,9 +989,9 @@
 				<div style="display: flex;">
 					{#each boardRow as _, col}
 						<div
-							class={displayGrid[row][
-								col
-							].className}
+							class="cell {displayGrid[
+								row
+							][col].className}"
 						>
 							{displayGrid[row][col]
 								.letter}
@@ -962,48 +1000,41 @@
 				</div>
 			{/each}
 		</div>
-		<div class="endPanel">
-			{#if phase == "gameover"}
-				<div
-					style="background-color: #d7e837; font-weight:bold"
-				>
-					GAME OVER
-				</div>
-				<button onclick={reset}>RESTART</button>
-			{/if}
-		</div>
 	</div>
-</div>
-<div class="keyboard">
-	{#each keyboardRows as row, i}
-		<div class="keyboardRow">
-			{#if i == 2}
-				<button
-					class="key wideKey"
-					type="button"
-					onclick={() => handleKeyDown("Enter")}
-					>ENTER</button
-				>
-			{/if}
-			{#each row.split("") as letter}
-				<button
-					class="key"
-					type="button"
-					onclick={() => handleKeyDown(letter)}
-					>{letter}</button
-				>
-			{/each}
-			{#if i == 2}
-				<button
-					class="key wideKey"
-					type="button"
-					onclick={() =>
-						handleKeyDown("Backspace")}
-					>DEL</button
-				>
-			{/if}
-		</div>
-	{/each}
+	<div class="keyboard">
+		{#each keyboardRows as row, i}
+			<div class="keyboardRow">
+				{#if i == 2}
+					<button
+						class="key wideKey"
+						type="button"
+						onclick={() =>
+							handleKeyDown("Enter")}
+						>ENTER</button
+					>
+				{/if}
+				{#each row.split("") as letter}
+					<button
+						class="key"
+						type="button"
+						onclick={() =>
+							handleKeyDown(letter)}
+						>{letter}</button
+					>
+				{/each}
+				{#if i == 2}
+					<button
+						class="key wideKey"
+						type="button"
+						onclick={() =>
+							handleKeyDown(
+								"Backspace",
+							)}>DEL</button
+					>
+				{/if}
+			</div>
+		{/each}
+	</div>
 </div>
 <svelte:window
 	onkeydown={(e) => {
@@ -1016,69 +1047,75 @@
 	:global(body) {
 		font-family: arial, helvetica, sans-serif;
 	}
-	.greenBox {
-		height: 20px;
-		width: 20px;
-		background-color: #d7e837;
-		border: solid 1px #ffffff;
-		text-align: center;
-		line-height: 20px;
-	}
-	.greyBox {
-		height: 20px;
-		width: 20px;
-		background-color: #a0a0a0;
-		border: solid 1px #ffffff;
-		text-align: center;
-		line-height: 20px;
-	}
-	.nullBox {
-		height: 20px;
-		width: 20px;
-		background-color: #f4f8ff;
-		border: solid 1px #ffffff;
-		text-align: center;
-		line-height: 20px;
-	}
-	.graceFilledBox {
-		height: 20px;
-		width: 20px;
-		border: solid 1px #ffffff;
-	}
-	.graceUnfilledBox {
-		height: 20px;
-		width: 20px;
-		border: solid 1px #ffffff;
-	}
-	.tetrisFilledBox {
-		height: 20px;
-		width: 20px;
-		background-color: #4067c4;
-		border: solid 1px #ffffff;
-	}
-	.tetrisUnfilledBox {
-		height: 20px;
-		width: 20px;
-		background-color: #e5edff;
-		border: solid 1px #ffffff;
-	}
 	.gameArea {
 		touch-action: none;
 		user-select: none;
+		--cell-height: min(
+			calc((95dvh - 290px) / var(--rows)),
+			calc((100vw - 160px) / var(--cols)),
+			25px
+		);
+		--cell-width: var(--cell-height);
+		--cell-border: solid 1px #ffffff;
+		--cell-text-align: center;
+		--cell-line-height: var(--cell-height);
+	}
+	.cell {
+		box-sizing: border-box;
+		height: var(--cell-height);
+		width: var(--cell-width);
+		border: var(--cell-border);
+		text-align: var(--cell-text-align);
+		line-height: var(--cell-line-height);
+		font-size: calc(var(--cell-height) * 0.6);
+	}
+	.greenBox {
+		background-color: #d7e837;
+	}
+	.greyBox {
+		background-color: #a0a0a0;
+	}
+	.nullBox {
+		background-color: #f4f8ff;
+	}
+	.tetrisFilledBox {
+		background-color: #4067c4;
+	}
+	.tetrisUnfilledBox {
+		background-color: #e5edff;
+	}
+	.graceFilledBox {
+	}
+	.graceUnfilledBox {
+	}
+	.activeCharge {
+		background-color: #d7e837;
+		width: 80px;
+		border: solid 2px white;
+		text-align: var(--cell-text-align);
+		line-height: var(--cell-line-height);
+		border-radius: 3px;
+		outline: solid 2px #d7e837;
+	}
+	.inactiveCharge {
+		background-color: #a0a0a0;
+		width: 80px;
+		border: solid 2px white;
+		text-align: var(--cell-text-align);
+		line-height: var(--cell-line-height);
+		border-radius: 3px;
+		outline: solid 2px #a0a0a0;
 	}
 	.gameGrid {
 		display: grid;
-		grid-template-columns: 1fr auto 1fr;
+		grid-template-columns: auto 1fr;
 		align-items: center;
 	}
 	.stats {
-		justify-self: end;
 		padding-right: 14px;
 	}
 	.endPanel {
-		justify-self: start;
 		padding-left: 14px;
-		text-align: center;
 	}
 	.keyboard {
 		display: none;
@@ -1093,7 +1130,7 @@
 	}
 	.key {
 		min-width: 28px;
-		height: 44px;
+		height: 40px;
 		padding: 0 4px;
 		font-size: 14px;
 		font-weight: bold;
