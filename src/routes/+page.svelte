@@ -22,7 +22,7 @@
 	let frameOrigin = $state([0, 2]);
 	let currBlock: string[][] = $state([]);
 	let rotationAnchor: number[] = $state([]);
-
+	let gameMode: "NORMAL" | "ZEN" | "DAILY" = $state("NORMAL");
 	const keyboardRows = ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"];
 	const STEP_PX = 24;
 	const TAP_SLOP_PX = 10;
@@ -101,7 +101,9 @@
 						currBlock,
 					)
 				) {
-					frameOrigin[0]++;
+					if (gameMode != "ZEN") {
+						frameOrigin[0]++;
+					}
 				} else {
 					currBlock = getBlock(currentLongest);
 					currBlockOrigin =
@@ -134,7 +136,9 @@
 						currBlock,
 					)
 				) {
-					frameOrigin[0]++;
+					if (gameMode != "ZEN") {
+						frameOrigin[0]++;
+					}
 				} else {
 					lockBlock(
 						currBlock,
@@ -919,6 +923,9 @@
 			[maxX, maxY],
 		];
 	}
+	function chooseMode(mode: "NORMAL" | "ZEN" | "DAILY") {
+		gameMode = mode;
+	}
 </script>
 
 <div
@@ -933,11 +940,29 @@
 	onpointercancel={handlePointerCancel}
 	style="display: grid; grid-template-rows:auto 1fr auto;  height: 95dvh;"
 >
-	<p
+	<div
 		style="font-size:25px ;text-align: center; font-weight:bold; margin: 15px;"
 	>
 		LEXITRIS
-	</p>
+		<button
+			onclick={() => {
+				chooseMode("DAILY");
+				reset();
+			}}>DAILY</button
+		>
+		<button
+			onclick={() => {
+				chooseMode("NORMAL");
+				reset();
+			}}>NORMAL</button
+		>
+		<button
+			onclick={() => {
+				chooseMode("ZEN");
+				reset();
+			}}>ZEN</button
+		>
+	</div>
 	<div class="gameGrid">
 		<div class="stats">
 			<p style="font-weight:bold; text-align: center;">
