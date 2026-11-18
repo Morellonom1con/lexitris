@@ -5,9 +5,11 @@
 
 	let validGuesses: Set<string>;
 	let validTargets: string[];
-
+	let targetGen: () => number;
+	const ROWS = 22;
+	const COLUMNS = 9;
 	let board: number[][] = $state(
-		Array.from({ length: 24 }, () => Array(10).fill(0)),
+		Array.from({ length: ROWS }, () => Array(COLUMNS).fill(0)),
 	);
 	let phase: "building" | "falling" | "gameover" = $state("building");
 
@@ -46,6 +48,9 @@
 		" ",
 		"Backspace",
 	];
+	let copied: "COPY RESULT" | "COPIED!" | "FAILED" =
+		$state("COPY RESULT");
+	let fallspeed: 4000 | 3500 | 3000 = $state(4000);
 	let greens = $derived.by(() => {
 		let greens = new Set<string>();
 		for (let i = 0; i < guesses.length; i++) {
@@ -72,6 +77,8 @@
 		),
 	);
 	let score: number = $state(0);
+	let wordsMade: number = $state(0);
+	let totalLinesCleared: number = $state(0);
 
 	onMount(async () => {
 		const validNonAnswers = new Set(
@@ -88,7 +95,7 @@
 		validTargets = [...validAnswers];
 		target = getNewTarget();
 	});
-	onMount(() => {
+	$effect(() => {
 		const interval = setInterval(() => {
 			if (phase == "building") {
 				if (
@@ -105,24 +112,29 @@
 						frameOrigin[0]++;
 					}
 				} else {
-					currBlock = getBlock(currentLongest);
-					currBlockOrigin =
-						getBoundingRect(
-							currentLongest,
-						)[0];
-					phase = "falling";
-					if (currBlock.length == 0) {
-						phase = "gameover";
-					} else {
-						rotationAnchor = [
-							currBlockOrigin[0] +
-								currBlock.length /
-									2,
-							currBlockOrigin[1] +
-								currBlock[0]
-									.length /
-									2,
-						];
+					if (gameMode != "ZEN") {
+						currBlock =
+							getBlock(
+								currentLongest,
+							);
+						currBlockOrigin =
+							getBoundingRect(
+								currentLongest,
+							)[0];
+						phase = "falling";
+						if (currBlock.length == 0) {
+							phase = "gameover";
+						} else {
+							rotationAnchor = [
+								currBlockOrigin[0] +
+									currBlock.length /
+										2,
+								currBlockOrigin[1] +
+									currBlock[0]
+										.length /
+										2,
+							];
+						}
 					}
 				}
 			} else if (phase == "falling") {
@@ -140,14 +152,16 @@
 						frameOrigin[0]++;
 					}
 				} else {
-					lockBlock(
-						currBlock,
-						frameOrigin,
-						currBlockOrigin,
-					);
+					if (gameMode != "ZEN") {
+						lockBlock(
+							currBlock,
+							frameOrigin,
+							currBlockOrigin,
+						);
+					}
 				}
 			}
-		}, 4000);
+		}, fallspeed);
 		return () => clearInterval(interval);
 	});
 	function rotateBlock(currBlock: string[][]) {
@@ -203,6 +217,24 @@
 			return true;
 		} else return false;
 	}
+	async function copyHandler() {
+		if (copied == "COPY RESULT") {
+			try {
+				await getCopyText();
+			} catch {
+				copied = "FAILED";
+
+				setTimeout(() => {
+					copied = "COPY RESULT";
+				}, 700);
+				return;
+			}
+			copied = "COPIED!";
+			setTimeout(() => {
+				copied = "COPY RESULT";
+			}, 1500);
+		}
+	}
 	function lockBlock(
 		currBlock: string[][],
 		frameOrigin: number[],
@@ -229,10 +261,17 @@
 				for (let j = i; j > 0; j--) {
 					board[j] = board[j - 1];
 				}
-				board[0] = Array(10).fill(0);
+				board[0] = Array(COLUMNS).fill(0);
 			}
 		}
+		totalLinesCleared += linesCleared;
 		score += getScoreForClear(linesCleared);
+
+		if (score > 1000) {
+			if (score > 2500) fallspeed = 3000;
+			else fallspeed = 3500;
+		}
+
 		for (let i = 0; i < 4; i++) {
 			for (let j = 0; j < board[0].length; j++) {
 				if (board[i][j] == 1) {
@@ -257,8 +296,8 @@
 		currBlock: string[][],
 		newGuess: string,
 	) {
-		let tempGrid: Cell[][] = Array.from({ length: 24 }, () =>
-			Array.from({ length: 10 }, () => ({
+		let tempGrid: Cell[][] = Array.from({ length: ROWS }, () =>
+			Array.from({ length: COLUMNS }, () => ({
 				className: "",
 				letter: "",
 			})),
@@ -285,8 +324,14 @@
 							r === guesses.length &&
 							newGuess[c]
 						) {
-							className = "nullBox";
+							className =
+								"fillingBox";
 							letter = newGuess[c];
+						} else if (
+							r === guesses.length
+						) {
+							className =
+								"fillingBox";
 						} else {
 							className = "nullBox";
 						}
@@ -333,9 +378,27 @@
 		return tempGrid;
 	}
 	function getNewTarget() {
-		const roll = Math.random();
-		const targetIndex = roll * validTargets.length;
-		return validTargets[Math.floor(targetIndex)].toUpperCase();
+		if (gameMode == "DAILY") {
+			const roll = targetGen();
+			const targetIndex = roll * validTargets.length;
+			return validTargets[
+				Math.floor(targetIndex)
+			].toUpperCase();
+		} else {
+			const roll = Math.random();
+			const targetIndex = roll * validTargets.length;
+			return validTargets[
+				Math.floor(targetIndex)
+			].toUpperCase();
+		}
+	}
+	function mulberry32(a: number) {
+		return function () {
+			var t = (a += 0x6d2b79f5);
+			t = Math.imul(t ^ (t >>> 15), t | 1);
+			t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+			return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+		};
 	}
 	function canFrameFall(
 		phase: "building" | "falling" | "gameover",
@@ -346,13 +409,13 @@
 		currBlock: string[][],
 	) {
 		if (phase == "building") {
-			const row = guesses.length + frameOrigin[0];
+			const row = guesses.length + frameOrigin[0] + 1;
 			for (
 				let i = frameOrigin[1];
 				i < frameOrigin[1] + 5;
 				i++
 			) {
-				if (row < 24) {
+				if (row < ROWS) {
 					if (board[row][i] == 1) return false;
 				} else return false;
 			}
@@ -374,7 +437,7 @@
 					cellsToBeChecked[i][0] +
 						currBlockOrigin[0] +
 						frameOrigin[0] <
-					24
+					ROWS
 				) {
 					if (
 						board[
@@ -560,6 +623,7 @@
 						rerollCharge = 0;
 					} else {
 						guesses.push(newGuess);
+						wordsMade += 1;
 						currBlock =
 							getBlock(
 								currentLongest,
@@ -571,6 +635,7 @@
 					}
 				} else {
 					guesses.push(newGuess);
+					wordsMade += 1;
 					currBlock = getBlock(currentLongest);
 					currBlockOrigin =
 						getBoundingRect(
@@ -612,8 +677,7 @@
 							frameOrigin,
 							[
 								frameOrigin[0] +
-									guesses.length -
-									1,
+									guesses.length,
 								frameOrigin[1] +
 									4,
 							],
@@ -643,8 +707,7 @@
 							frameOrigin,
 							[
 								frameOrigin[0] +
-									guesses.length -
-									1,
+									guesses.length,
 								frameOrigin[1] +
 									4,
 							],
@@ -818,11 +881,30 @@
 		rerollCharge = 1;
 		holdCharge = 1;
 	}
+	function getDateString() {
+		const pad = (n: Number) => String(n).padStart(2, "0");
+		const d = new Date();
+
+		const s =
+			pad(d.getDate()) +
+			pad(d.getMonth() + 1) +
+			d.getFullYear();
+		return s;
+	}
 	function reset() {
+		if (gameMode == "DAILY") {
+			const s = getDateString();
+			targetGen = mulberry32(Number(s));
+		}
 		nextBuild();
-		board = Array.from({ length: 24 }, () => Array(10).fill(0));
+		board = Array.from({ length: ROWS }, () =>
+			Array(COLUMNS).fill(0),
+		);
 		score = 0;
+		wordsMade = 0;
+		totalLinesCleared = 0;
 		heldWord = "";
+		fallspeed = 4000;
 	}
 	function withinFrame(frameOrigin: number[], coord: number[]) {
 		if (
@@ -926,6 +1008,19 @@
 	function chooseMode(mode: "NORMAL" | "ZEN" | "DAILY") {
 		gameMode = mode;
 	}
+
+	function getCopyText() {
+		let copyText = "Lexitris" + "\n" + gameMode;
+		let s = getDateString();
+		if (gameMode == "DAILY") {
+			copyText += " #" + s + "\n";
+		}
+		copyText += "\nSCORE = " + score + "\n";
+		copyText += "WORDS MADE = " + wordsMade + "\n";
+		copyText += "LINES CLEARED = " + totalLinesCleared + "\n";
+
+		return navigator.clipboard.writeText(copyText);
+	}
 </script>
 
 <div
@@ -938,12 +1033,12 @@
 	onpointermove={handlePointerMove}
 	onpointerup={handlePointerUp}
 	onpointercancel={handlePointerCancel}
-	style="display: grid; grid-template-rows:auto 1fr auto;  height: 95dvh;"
+	style="display: grid; grid-template-rows:auto auto 1fr auto;  height: 95dvh;"
 >
-	<div
-		style="font-size:25px ;text-align: center; font-weight:bold; margin: 15px;"
-	>
+	<div style="font-size:30px ; font-weight:bold; margin: 15px;">
 		LEXITRIS
+	</div>
+	<div style="font-size:25px ; font-weight:bold;">
 		<button
 			onclick={() => {
 				chooseMode("DAILY");
@@ -963,103 +1058,152 @@
 			}}>ZEN</button
 		>
 	</div>
-	<div class="gameGrid">
-		<div class="stats">
-			<p style="font-weight:bold; text-align: center;">
-				SCORE
-			</p>
-			<p style="font-weight:bold; text-align: center;">
-				{score}
-			</p>
-			<br />
-			<br />
-			<p style="text-align: center;">On Hold</p>
-			<p style="text-align: center;"><b>{heldWord}</b></p>
-			<br />
-			<br />
-			<p
-				class={rerollCharge == 1
-					? "activeCharge"
-					: "inactiveCharge"}
+
+	{#if phase == "gameover"}
+		<div class="endPanel">
+			<div
+				style="background-color: #d7e837; font-weight:bold;"
 			>
-				REROLL
-			</p>
-			<p
-				class={holdCharge == 1
-					? "activeCharge"
-					: "inactiveCharge"}
+				<div
+					style="font-size:25px ; font-weight:bold; "
+				>
+					GAME OVER
+				</div>
+				<br />
+				<div
+					style="font-size:25px ; font-weight:bold; "
+				>
+					SCORE
+				</div>
+				<div
+					style="font-size:25px ; font-weight:bold; "
+				>
+					{score}
+				</div>
+				<div
+					style="font-size:25px ; font-weight:bold; "
+				>
+					WORDS MADE
+				</div>
+				<div
+					style="font-size:25px ; font-weight:bold; "
+				>
+					{wordsMade}
+				</div>
+				<div
+					style="font-size:25px ; font-weight:bold; "
+				>
+					LINES CLEARED
+				</div>
+				<div
+					style="font-size:25px ; font-weight:bold; "
+				>
+					{totalLinesCleared}
+				</div>
+			</div>
+			<button onclick={copyHandler}>{copied}</button>
+			<button onclick={reset}>RESTART</button>
+		</div>
+	{:else}
+		<div class="gameGrid">
+			<div class="stats">
+				<p
+					style="font-weight:bold; text-align: center;"
+				>
+					SCORE
+				</p>
+				<p
+					style="font-weight:bold; text-align: center;"
+				>
+					{score}
+				</p>
+				<br />
+				<br />
+				<p style="text-align: center;">On Hold</p>
+				<p style="text-align: center;">
+					<b>{heldWord}</b>
+				</p>
+				<br />
+				<br />
+				<p
+					class={rerollCharge == 1
+						? "activeCharge"
+						: "inactiveCharge"}
+				>
+					REROLL
+				</p>
+				<p
+					class={holdCharge == 1
+						? "activeCharge"
+						: "inactiveCharge"}
+				>
+					HOLD
+				</p>
+			</div>
+			<div
+				style="display: flex; flex-direction:column; align-items: center;"
 			>
-				HOLD
-			</p>
-			<div class="endPanel">
-				{#if phase == "gameover"}
-					<div
-						style="background-color: #d7e837; font-weight:bold"
-					>
-						GAME OVER
+				<p
+					style="font-size:25px; font-weight:bold;background-color: #d7e837;"
+				>
+					{target}
+				</p>
+				{#each displayGrid as boardRow, row}
+					<div style="display: flex;">
+						{#each boardRow as _, col}
+							<div
+								class="cell {displayGrid[
+									row
+								][col]
+									.className}"
+							>
+								{displayGrid[
+									row
+								][col].letter}
+							</div>
+						{/each}
 					</div>
-					<button onclick={reset}>RESTART</button>
-				{/if}
+				{/each}
 			</div>
 		</div>
-		<div
-			style="display: flex; flex-direction:column; align-items: center;"
-		>
-			<p
-				style="font-size:25px; font-weight:bold;background-color: #d7e837;"
-			>
-				{target}
-			</p>
-			{#each displayGrid as boardRow, row}
-				<div style="display: flex;">
-					{#each boardRow as _, col}
-						<div
-							class="cell {displayGrid[
-								row
-							][col].className}"
+		<div class="keyboard">
+			{#each keyboardRows as row, i}
+				<div class="keyboardRow">
+					{#if i == 2}
+						<button
+							class="key wideKey"
+							type="button"
+							onclick={() =>
+								handleKeyDown(
+									"Enter",
+								)}>ENTER</button
 						>
-							{displayGrid[row][col]
-								.letter}
-						</div>
+					{/if}
+					{#each row.split("") as letter}
+						<button
+							class="key"
+							type="button"
+							onclick={() =>
+								handleKeyDown(
+									letter,
+								)}
+							>{letter}</button
+						>
 					{/each}
+					{#if i == 2}
+						<button
+							class="key wideKey"
+							type="button"
+							onclick={() =>
+								handleKeyDown(
+									"Backspace",
+								)}>DEL</button
+						>
+					{/if}
 				</div>
 			{/each}
 		</div>
-	</div>
-	<div class="keyboard">
-		{#each keyboardRows as row, i}
-			<div class="keyboardRow">
-				{#if i == 2}
-					<button
-						class="key wideKey"
-						type="button"
-						onclick={() =>
-							handleKeyDown("Enter")}
-						>ENTER</button
-					>
-				{/if}
-				{#each row.split("") as letter}
-					<button
-						class="key"
-						type="button"
-						onclick={() =>
-							handleKeyDown(letter)}
-						>{letter}</button
-					>
-				{/each}
-				{#if i == 2}
-					<button
-						class="key wideKey"
-						type="button"
-						onclick={() =>
-							handleKeyDown(
-								"Backspace",
-							)}>DEL</button
-					>
-				{/if}
-			</div>
-		{/each}
-	</div>
+	{/if}
 </div>
 <svelte:window
 	onkeydown={(e) => {
@@ -1070,7 +1214,7 @@
 
 <style>
 	:global(body) {
-		font-family: arial, helvetica, sans-serif;
+		font-family: "Alexandria", helvetica, sans-serif;
 	}
 	.gameArea {
 		touch-action: none;
@@ -1102,6 +1246,9 @@
 	}
 	.nullBox {
 		background-color: #f4f8ff;
+	}
+	.fillingBox {
+		background-color: #ffd8fe;
 	}
 	.tetrisFilledBox {
 		background-color: #4067c4;
