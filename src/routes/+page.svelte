@@ -3,7 +3,7 @@
 	type Cell = { className: string; letter: string };
 	const maxGuesses = 4;
 
-	let validGuesses: Set<string>;
+	let validGuesses: Set<string> = new Set();
 	let validTargets: string[];
 	let targetGen: () => number;
 	const ROWS = 22;
@@ -80,21 +80,49 @@
 	let wordsMade: number = $state(0);
 	let totalLinesCleared: number = $state(0);
 
-	onMount(async () => {
-		const validNonAnswers = new Set(
-			(await (await fetch("/guesses.txt")).text()).split(
-				"\n",
-			),
-		);
-		const validAnswers = new Set(
-			(await (await fetch("/answers.txt")).text()).split(
-				"\n",
-			),
-		);
-		validGuesses = new Set(validNonAnswers.union(validAnswers));
-		validTargets = [...validAnswers];
-		target = getNewTarget();
-	});
+	let wordsStatus: "loading" | "ready" | "error" = $state("loading");
+
+	async function fetchWordList(url: string): Promise<string[]> {
+		const res = await fetch(url, { cache: "no-cache" });
+		if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
+		const words = (await res.text())
+			.split("\n")
+			.map((w) => w.trim())
+			.filter(Boolean);
+		if (words.length === 0) throw new Error(`${url}: empty`);
+		return words;
+	}
+
+	async function loadWords() {
+		wordsStatus = "loading";
+		const attempts = 3;
+		for (let i = 0; i < attempts; i++) {
+			try {
+				const [nonAnswers, answers] = await Promise.all([
+					fetchWordList("/guesses.txt"),
+					fetchWordList("/answers.txt"),
+				]);
+				// Set.prototype.union needs iOS 17+, so merge manually.
+				validGuesses = new Set([...nonAnswers, ...answers]);
+				validTargets = answers;
+				target = getNewTarget();
+				wordsStatus = "ready";
+				return;
+			} catch (err) {
+				console.error(
+					`Word list load failed (attempt ${i + 1}/${attempts})`,
+					err,
+				);
+				if (i < attempts - 1)
+					await new Promise((r) =>
+						setTimeout(r, 1000 * 2 ** i),
+					);
+			}
+		}
+		wordsStatus = "error";
+	}
+
+	onMount(loadWords);
 	$effect(() => {
 		const interval = setInterval(() => {
 			if (phase == "building") {
@@ -1205,6 +1233,12 @@
 		</div>
 	{/if}
 </div>
+{#if wordsStatus === "error"}
+	<div class="wordsError" role="alert">
+		Couldn't load the word list, so guesses can't be checked.
+		<button type="button" onclick={loadWords}>RETRY</button>
+	</div>
+{/if}
 <svelte:window
 	onkeydown={(e) => {
 		if (controlkeys.includes(e.key)) e.preventDefault();
@@ -1310,6 +1344,28 @@
 		border: solid 1px #a0a0a0;
 		border-radius: 4px;
 		background-color: #ffffff;
+		touch-action: manipulation;
+	}
+	.wordsError {
+		position: fixed;
+		top: 12px;
+		left: 50%;
+		transform: translateX(-50%);
+		width: max-content;
+		max-width: calc(100vw - 32px);
+		padding: 10px 14px;
+		display: flex;
+		gap: 12px;
+		align-items: center;
+		background-color: #ffe1e1;
+		border: solid 1px #c44040;
+		border-radius: 6px;
+		font-size: 14px;
+		z-index: 10;
+	}
+	.wordsError button {
+		font-family: inherit;
+		font-weight: bold;
 		touch-action: manipulation;
 	}
 	.key:active {
