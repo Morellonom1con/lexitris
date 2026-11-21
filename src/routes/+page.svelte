@@ -4,6 +4,7 @@
 	const maxGuesses = 4;
 
 	let validGuesses: Set<string> = new Set();
+	let holdState: "HOLD" | "HOLDING" = $state("HOLD");
 	let validTargets: string[];
 	let targetGen: () => number;
 	const ROWS = 22;
@@ -98,12 +99,17 @@
 		const attempts = 3;
 		for (let i = 0; i < attempts; i++) {
 			try {
-				const [nonAnswers, answers] = await Promise.all([
-					fetchWordList("/guesses.txt"),
-					fetchWordList("/answers.txt"),
-				]);
+				const [nonAnswers, answers] = await Promise.all(
+					[
+						fetchWordList("/guesses.txt"),
+						fetchWordList("/answers.txt"),
+					],
+				);
 				// Set.prototype.union needs iOS 17+, so merge manually.
-				validGuesses = new Set([...nonAnswers, ...answers]);
+				validGuesses = new Set([
+					...nonAnswers,
+					...answers,
+				]);
 				validTargets = answers;
 				target = getNewTarget();
 				wordsStatus = "ready";
@@ -606,6 +612,7 @@
 							heldWord = target;
 							target = getNewTarget();
 							holdCharge = 0;
+							holdState = "HOLDING";
 						} else {
 							let temp = heldWord;
 							heldWord = target;
@@ -1063,9 +1070,6 @@
 	onpointercancel={handlePointerCancel}
 	style="display: grid; grid-template-rows:auto auto 1fr auto;  height: 95dvh;"
 >
-	<div style="font-size:30px ; font-weight:bold; margin: 15px;">
-		LEXITRIS
-	</div>
 	<div style="font-size:25px ; font-weight:bold;">
 		<button
 			onclick={() => {
@@ -1093,7 +1097,7 @@
 				style="background-color: #d7e837; font-weight:bold;"
 			>
 				<div
-					style="font-size:25px ; font-weight:bold; "
+					style="font-size:40px ; font-weight:bold; "
 				>
 					GAME OVER
 				</div>
@@ -1138,21 +1142,8 @@
 				<p
 					style="font-weight:bold; text-align: center;"
 				>
-					SCORE
+					SCORE : {score}
 				</p>
-				<p
-					style="font-weight:bold; text-align: center;"
-				>
-					{score}
-				</p>
-				<br />
-				<br />
-				<p style="text-align: center;">On Hold</p>
-				<p style="text-align: center;">
-					<b>{heldWord}</b>
-				</p>
-				<br />
-				<br />
 				<p
 					class={rerollCharge == 1
 						? "activeCharge"
@@ -1165,8 +1156,9 @@
 						? "activeCharge"
 						: "inactiveCharge"}
 				>
-					HOLD
+					{holdState}
 				</p>
+				<p>{heldWord}</p>
 			</div>
 			<div
 				style="display: flex; flex-direction:column; align-items: center;"
@@ -1314,11 +1306,31 @@
 	}
 	.gameGrid {
 		display: grid;
-		grid-template-columns: auto 1fr;
 		align-items: center;
 	}
+	/* 120% of the board width; everything scales with cell size so it
+	   stays on one line at any screen size. */
 	.stats {
-		padding-right: 14px;
+		display: flex;
+		flex-wrap: nowrap;
+		justify-content: space-between;
+		align-items: center;
+		gap: calc(var(--cell-width) * 0.15);
+		box-sizing: border-box;
+		width: calc(var(--cols) * var(--cell-width) * 1.2);
+		justify-self: center;
+		font-size: calc(var(--cell-height) * 0.59);
+		white-space: nowrap;
+	}
+	.stats p {
+		margin: 4px 0;
+	}
+	/* Size the charge boxes to their text so the bigger font still fits. */
+	.stats .activeCharge,
+	.stats .inactiveCharge {
+		box-sizing: border-box;
+		width: auto;
+		padding: 0 calc(var(--cell-width) * 0.2);
 	}
 	.endPanel {
 		padding-left: 14px;
