@@ -1332,6 +1332,7 @@
 		text-align: var(--cell-text-align);
 		line-height: var(--cell-line-height);
 		font-size: calc(var(--cell-height) * 0.6);
+		font-weight: bold;
 	}
 	.greenBox {
 		background-color: #d7e837;
