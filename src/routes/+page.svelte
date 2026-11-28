@@ -369,7 +369,10 @@
 							className =
 								"fillingBox";
 						} else {
-							className = "nullBox";
+							className =
+								board[i][j] == 1
+									? "nullFilledBox"
+									: "nullBox";
 						}
 						tempGrid[i][j].className =
 							className;
@@ -1342,6 +1345,9 @@
 	}
 	.nullBox {
 		background-color: #f4f8ff;
+	}
+	.nullFilledBox {
+		background-color: #8fa6dc;
 	}
 	.fillingBox {
 		background-color: #ffd8fe;
