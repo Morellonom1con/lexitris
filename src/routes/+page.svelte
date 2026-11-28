@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from "svelte";
+	import { X } from "@lucide/svelte";
 	type Cell = { className: string; letter: string };
 	const maxGuesses = 4;
 
@@ -12,7 +13,8 @@
 	let board: number[][] = $state(
 		Array.from({ length: ROWS }, () => Array(COLUMNS).fill(0)),
 	);
-	let phase: "building" | "falling" | "gameover" = $state("building");
+	let phase: "building" | "falling" | "gameover" | "home" =
+		$state("home");
 
 	let target: string = $state("NOTCH");
 	let guesses: string[] = $state([]);
@@ -322,7 +324,7 @@
 	}
 	function updateGrid(
 		board: number[][],
-		phase: "building" | "falling" | "gameover",
+		phase: "building" | "falling" | "gameover" | "home",
 		guesses: string[],
 		frameOrigin: number[],
 		currBlockOrigin: number[],
@@ -435,7 +437,7 @@
 		};
 	}
 	function canFrameFall(
-		phase: "building" | "falling" | "gameover",
+		phase: "building" | "falling" | "gameover" | "home",
 		frameOrigin: number[],
 		currBlockOrigin: number[],
 		guesses: string[],
@@ -764,7 +766,7 @@
 			}
 		}
 		if (key == "ArrowDown") {
-			if (phase != "gameover") {
+			if (phase != "gameover" && phase != "home") {
 				if (
 					canFrameFall(
 						phase,
@@ -806,12 +808,12 @@
 			}
 		}
 		if (key == "Backspace") {
-			if (phase != "gameover") {
+			if (phase != "gameover" && phase != "home") {
 				newGuess = newGuess.slice(0, -1);
 			}
 		}
 		if (key == "`") {
-			if (phase != "gameover") {
+			if (phase != "gameover" && phase != "home") {
 				reset();
 			}
 		}
@@ -837,7 +839,7 @@
 			}
 		}
 		if (newGuess.length < 5 && key.match(/^[a-zA-Z]$/)) {
-			if (phase != "gameover") {
+			if (phase != "gameover" && phase != "home") {
 				newGuess += key.toUpperCase();
 			}
 		}
@@ -939,6 +941,7 @@
 		wordsMade = 0;
 		totalLinesCleared = 0;
 		heldWord = "";
+		holdState = "HOLD";
 		fallspeed = 4000;
 	}
 	function withinFrame(frameOrigin: number[], coord: number[]) {
@@ -1056,10 +1059,14 @@
 
 		return navigator.clipboard.writeText(copyText);
 	}
+	function goHomeScreen() {
+		phase = "home";
+	}
 </script>
 
 <div
 	class="gameArea"
+	class:menu={phase == "home" || phase == "gameover"}
 	style:--rows={displayGrid.length}
 	style:--cols={displayGrid[0]?.length ?? 1}
 	role="application"
@@ -1068,82 +1075,102 @@
 	onpointermove={handlePointerMove}
 	onpointerup={handlePointerUp}
 	onpointercancel={handlePointerCancel}
-	style="display: grid; grid-template-rows:auto auto 1fr auto;  height: 95dvh;"
 >
-	<div style="font-size:25px ; font-weight:bold;">
-		<button
-			onclick={() => {
-				chooseMode("DAILY");
-				reset();
-			}}>DAILY</button
-		>
-		<button
-			onclick={() => {
-				chooseMode("NORMAL");
-				reset();
-			}}>NORMAL</button
-		>
-		<button
-			onclick={() => {
-				chooseMode("ZEN");
-				reset();
-			}}>ZEN</button
-		>
-	</div>
-
 	{#if phase == "gameover"}
 		<div class="endPanel">
-			<div
-				style="background-color: #d7e837; font-weight:bold;"
-			>
+			<div style="margin: min(3cqw,3cqh);">
 				<div
-					style="font-size:40px ; font-weight:bold; "
+					style="font-size:min(13cqw,13cqh) ; font-weight:bold; "
 				>
 					GAME OVER
 				</div>
 				<br />
 				<div
-					style="font-size:25px ; font-weight:bold; "
+					style="font-weight:bold; font-size: min(5cqh, 5cqw);
+				"
 				>
 					SCORE
 				</div>
 				<div
-					style="font-size:25px ; font-weight:bold; "
+					style="font-weight:bold; font-size: min(6cqh, 6cqw); color:#d7e837
+				"
 				>
-					{score}
+					{score} PTS
 				</div>
+				<br />
 				<div
-					style="font-size:25px ; font-weight:bold; "
+					style="font-weight:bold; font-size: min(5cqh, 5cqw);
+				"
 				>
 					WORDS MADE
 				</div>
 				<div
-					style="font-size:25px ; font-weight:bold; "
+					style="font-weight:bold; font-size: min(5cqh, 5cqw);
+				"
 				>
 					{wordsMade}
 				</div>
+				<br />
 				<div
-					style="font-size:25px ; font-weight:bold; "
+					style="font-weight:bold; font-size: min(5cqh, 5cqw);
+				"
 				>
 					LINES CLEARED
 				</div>
 				<div
-					style="font-size:25px ; font-weight:bold; "
+					style="font-weight:bold; font-size: min(5cqh, 5cqw);
+				"
 				>
 					{totalLinesCleared}
 				</div>
+				<div style="height:min(8cqw,8cqh)"></div>
+				<button class="endButton" onclick={copyHandler}
+					>> {copied}</button
+				><br />
+				<button class="endButton" onclick={reset}
+					>> RESTART</button
+				><br />
+				<button class="endButton" onclick={goHomeScreen}
+					>> SWITCH MODE</button
+				>
 			</div>
-			<button onclick={copyHandler}>{copied}</button>
-			<button onclick={reset}>RESTART</button>
+		</div>
+	{:else if phase == "home"}
+		<div style="margin: min(3cqw,3cqh);">
+			<div
+				style="font-size:min(13cqw,13cqh) ; font-weight:bold; "
+			>
+				LEXITRIS
+			</div>
+			<div style="height:min(15cqw,15cqh)"></div>
+			<button
+				class="modeButton"
+				onclick={() => {
+					chooseMode("DAILY");
+					reset();
+				}}>> DAILY</button
+			>
+			<br />
+			<button
+				class="modeButton"
+				onclick={() => {
+					chooseMode("NORMAL");
+					reset();
+				}}>> NORMAL</button
+			>
+			<br />
+			<button
+				class="modeButton"
+				onclick={() => {
+					chooseMode("ZEN");
+					reset();
+				}}>> ZEN</button
+			>
 		</div>
 	{:else}
 		<div class="gameGrid">
 			<div class="stats">
-				<p
-					style="font-weight:bold; text-align: center;"
-				>
-					SCORE : {score}
-				</p>
+				<p class="score">{score} PTS</p>
 				<p
 					class={rerollCharge == 1
 						? "activeCharge"
@@ -1158,16 +1185,21 @@
 				>
 					{holdState}
 				</p>
-				<p>{heldWord}</p>
-			</div>
-			<div
-				style="display: flex; flex-direction:column; align-items: center;"
-			>
-				<p
-					style="font-size:25px; font-weight:bold;background-color: #d7e837;"
+				<p class="heldWord">{heldWord}</p>
+				<button
+					class="exitButton"
+					type="button"
+					aria-label="Exit to home screen"
+					title="Exit"
+					onpointerdown={(e) =>
+						e.stopPropagation()}
+					onclick={goHomeScreen}
 				>
-					{target}
-				</p>
+					<X strokeWidth={3} />
+				</button>
+			</div>
+			<div class="board">
+				<p class="target">{target}</p>
 				{#each displayGrid as boardRow, row}
 					<div style="display: flex;">
 						{#each boardRow as _, col}
@@ -1239,21 +1271,58 @@
 />
 
 <style>
+	:global(html),
 	:global(body) {
-		font-family: "Alexandria", helvetica, sans-serif;
+		height: 100%;
+	}
+	:global(body) {
+		font-family: "Outfit", helvetica, sans-serif;
+		margin: 0;
+		height: 100dvh;
+		overflow: hidden;
+		display: grid;
+		place-items: center;
+		background-color: var(--letterbox-color, #ffffff);
 	}
 	.gameArea {
+		--stage-w: 16.5;
+		--stage-h: 28;
+		--kb-h: 0cqh;
+		--grid-pad-bottom: 1;
+		--play-cells: calc(27 + var(--grid-pad-bottom));
+
+		width: min(100dvw, 100dvh * var(--stage-w) / var(--stage-h));
+		height: min(100dvh, 100dvw * var(--stage-h) / var(--stage-w));
+		container-type: size;
+		box-sizing: border-box;
+		overflow: hidden;
+		display: flex;
+		flex-direction: column;
+		background-color: #ffffff;
 		touch-action: none;
 		user-select: none;
-		--cell-height: min(
-			calc((95dvh - 290px) / var(--rows)),
-			calc((100vw - 160px) / var(--cols)),
-			25px
-		);
+		-webkit-user-select: none;
+
+		--cell-height: calc((100cqh - var(--kb-h)) / var(--play-cells));
 		--cell-width: var(--cell-height);
 		--cell-border: solid 1px #ffffff;
 		--cell-text-align: center;
 		--cell-line-height: var(--cell-height);
+	}
+	@media (pointer: coarse) {
+		.gameArea {
+			/* iPhone 16 viewport */
+			--stage-w: 393;
+			--stage-h: 852;
+			--kb-h: 23cqh;
+			--grid-pad-bottom: 0;
+		}
+	}
+	.gameArea.menu {
+		width: 100dvw;
+		height: 100dvh;
+		justify-self: start;
+		align-self: start;
 	}
 	.cell {
 		box-sizing: border-box;
@@ -1288,8 +1357,9 @@
 	}
 	.activeCharge {
 		background-color: #d7e837;
-		width: 80px;
 		border: solid 2px white;
+		color: white;
+		font-weight: bold;
 		text-align: var(--cell-text-align);
 		line-height: var(--cell-line-height);
 		border-radius: 3px;
@@ -1297,7 +1367,8 @@
 	}
 	.inactiveCharge {
 		background-color: #a0a0a0;
-		width: 80px;
+		font-weight: bold;
+		color: white;
 		border: solid 2px white;
 		text-align: var(--cell-text-align);
 		line-height: var(--cell-line-height);
@@ -1305,56 +1376,129 @@
 		outline: solid 2px #a0a0a0;
 	}
 	.gameGrid {
-		display: grid;
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: calc(var(--cell-height) * 0.4);
+		padding-bottom: calc(
+			var(--cell-height) * var(--grid-pad-bottom)
+		);
+	}
+	.board {
+		display: flex;
+		flex-direction: column;
 		align-items: center;
 	}
-	/* 120% of the board width; everything scales with cell size so it
-	   stays on one line at any screen size. */
+	.target {
+		margin: 0 0 calc(var(--cell-height) * 0.3);
+		padding: calc(var(--cell-height) * 0.15)
+			calc(var(--cell-height) * 0.25);
+		font-size: calc(var(--cell-height) * 1.1);
+		line-height: 1.2;
+		font-weight: bold;
+		background-color: #d7e837;
+	}
 	.stats {
-		display: flex;
-		flex-wrap: nowrap;
-		justify-content: space-between;
+		height: calc(var(--cell-height) * 1.6);
 		align-items: center;
-		gap: calc(var(--cell-width) * 0.15);
+		justify-content: center;
+		font-size: calc(var(--cell-height) * 0.6);
+		display: flex;
+		gap: calc(var(--cell-width) * 0.3);
 		box-sizing: border-box;
-		width: calc(var(--cols) * var(--cell-width) * 1.2);
-		justify-self: center;
-		font-size: calc(var(--cell-height) * 0.59);
+		width: calc(var(--cols) * var(--cell-width) * 1.75);
+		max-width: 100%;
 		white-space: nowrap;
 	}
 	.stats p {
-		margin: 4px 0;
+		margin: 0;
 	}
-	/* Size the charge boxes to their text so the bigger font still fits. */
+	.stats .score {
+		/* 7 digits + " PTS" */
+		width: 11ch;
+		font-weight: bold;
+		font-variant-numeric: tabular-nums;
+	}
+	.stats .heldWord {
+		width: 5.5em;
+		font-weight: bold;
+	}
+	.exitButton {
+		flex: none;
+		box-sizing: border-box;
+		height: calc(var(--cell-height) + 4px);
+		width: calc(var(--cell-height) + 4px);
+		padding: 0;
+		display: grid;
+		place-items: center;
+		cursor: pointer;
+		color: #ffffff;
+		background-color: #c44040;
+		border: solid 2px #ffffff;
+		outline: solid 2px #c44040;
+		border-radius: 3px;
+		touch-action: manipulation;
+	}
+	.exitButton:active {
+		background-color: #9e2f2f;
+		outline-color: #9e2f2f;
+	}
+	.exitButton :global(svg) {
+		width: 1em;
+		height: 1em;
+	}
 	.stats .activeCharge,
 	.stats .inactiveCharge {
 		box-sizing: border-box;
-		width: auto;
+		width: 9ch;
 		padding: 0 calc(var(--cell-width) * 0.2);
 	}
 	.endPanel {
-		padding-left: 14px;
+		padding-left: 3.5cqw;
 	}
 	.keyboard {
 		display: none;
+		height: var(--kb-h);
+		flex: none;
+		box-sizing: border-box;
 		flex-direction: column;
 		align-items: center;
-		gap: 6px;
-		margin-top: 12px;
+		justify-content: center;
+		--kb-pad-y: 1.2cqh;
+		--kb-pad-x: 1.5cqw;
+		--kb-gap-y: 0.6cqh;
+		--kb-gap-x: 1cqw;
+		gap: var(--kb-gap-y);
+		padding: var(--kb-pad-y) var(--kb-pad-x);
+		--key-height: calc(
+			(
+					var(--kb-h) - 2 * var(--kb-pad-y) - 2 *
+						var(--kb-gap-y)
+				) / 3
+		);
+		--key-width: calc(
+			(100cqw - 2 * var(--kb-pad-x) - 9 * var(--kb-gap-x)) /
+				10
+		);
 	}
 	.keyboardRow {
 		display: flex;
-		gap: 4px;
+		gap: var(--kb-gap-x);
 	}
 	.key {
-		min-width: 28px;
-		height: 40px;
-		padding: 0 4px;
-		font-size: 14px;
+		height: var(--key-height);
+		width: var(--key-width);
+		padding: 0;
+		font-size: calc(var(--key-height) * 0.45);
+		box-sizing: border-box;
 		font-weight: bold;
 		font-family: inherit;
-		border: solid 1px #a0a0a0;
-		border-radius: 4px;
+		color: inherit;
+		border: solid 0.2cqh #a0a0a0;
+		border-radius: 0.4cqh;
 		background-color: #ffffff;
 		touch-action: manipulation;
 	}
@@ -1384,8 +1528,26 @@
 		background-color: #d7e837;
 	}
 	.wideKey {
-		min-width: 44px;
-		font-size: 11px;
+		font-size: calc(var(--key-height) * 0.25);
+		width: calc(1.5 * var(--key-width));
+	}
+	.modeButton {
+		cursor: pointer;
+		font-size: min(10cqh, 10cqw);
+		font-weight: bold;
+		font-family: inherit;
+		background: #d7e837;
+		padding: 1cqw;
+		border: 1px solid transparent;
+	}
+	.endButton {
+		cursor: pointer;
+		font-size: min(4cqh, 4cqw);
+		font-weight: bold;
+		font-family: inherit;
+		background: #d7e837;
+		padding: 1cqw;
+		border: 1px solid transparent;
 	}
 	@media (pointer: coarse) {
 		.keyboard {
